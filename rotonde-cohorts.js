@@ -70,23 +70,62 @@ async function processCohortPortals () {
       const webdbCohortPortals = new WebDB(`${webdbDir}/${name}`, { DatArchive })
       webdbCohortPortals.define('portals', portalDefinition)
       await webdbCohortPortals.open()
-      let i = 0
-      for (const portalUrl of port) {
-        const num = i++
-        console.log(`  ${num}:`, portalUrl)
-        try {
-          await webdbCohortPortals.addSource(portalUrl)
-        } catch (err) {
-          console.log('Error', err)
-          console.log(`  Timeout: ${num}`)
+      const fetchers = {}
+      webdbCohortPortals.on('indexes-updated', async ({ url }, version) => {
+        if (!fetchers[url]) {
+          console.log('indexes-updated for', url, 'at version', version)
+        } else {
+          fetchers[url].fetched = true
+          fetchers[url].version = version
         }
-      }
-      console.log('Collecting data for 10 seconds')
-      webdbCohortPortals.on('index-updated', async ({ url }, version) => {
-        console.log('Table was updated for', url, 'at version', version)
-        // await listPortals()
       })
-      await sleep(10)
+      let count = 1
+      for (const portalUrl of port) {
+        const index = count++
+        console.log(`  ${index}:`, portalUrl)
+        const normalizedUrl = portalUrl.replace(/\/$/, '')
+        const fetcher = {
+          index,
+          normalizedUrl,
+          portalUrl
+        }
+        fetchers[normalizedUrl] = fetcher
+        fetcher.promise = webdbCohortPortals
+          .addSource(portalUrl)
+          .catch(err => {
+            // console.log('Error', err)
+            // FIXME: Is this error a timeout?
+            console.log(`  Timeout: ${index} ${portalUrl}`)
+            fetcher.error = err
+          })
+      }
+      const total = count - 1
+      webdbCohortPortals.on('index-updated', async ({ url }, version) => {
+        // await listPortals()
+        if (!fetchers[url]) {
+          console.log('Table was updated for', url, 'at version', version)
+          // console.log('indexes-updated for', url, 'at version', version)
+        } else {
+          fetchers[url].fetched = true
+          fetchers[url].version = version
+        }
+      })
+      const settleTime = 10
+      console.log(`Collecting data for ${settleTime} seconds`)
+      for (let i = 1; i <= settleTime; i++ ) {
+        await sleep(1)
+        let fetchedCount = 0
+        let errorCount = 0
+        Object.values(fetchers).forEach(({ fetched, error }) => {
+          if (fetched) fetchedCount++
+          if (error) errorCount++
+        })
+        console.log(
+          `  ${i} seconds: ` +
+          `${fetchedCount} fetched, ${errorCount} errors`
+        )
+        if (fetchedCount + errorCount === total) break
+      }
       await webdbCohortPortals.close()
     }
   }

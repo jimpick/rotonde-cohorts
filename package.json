@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@beaker/webdb": "^2.0.0",
+    "@beaker/webdb": "^2.0.1",
     "mkdirp": "^0.5.1",
     "node-dat-archive": "^1.5.0"
   },
