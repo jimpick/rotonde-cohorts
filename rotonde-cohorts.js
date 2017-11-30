@@ -93,9 +93,12 @@ async function processCohortPortals () {
         fetcher.promise = webdbCohortPortals
           .addSource(portalUrl)
           .catch(err => {
-            // console.log('Error', err)
-            // FIXME: Is this error a timeout?
-            console.log(`  Timeout: ${index} ${portalUrl}`)
+            if (err.name === 'TimeoutError') {
+              console.log(`---> Timeout: ${index} ${portalUrl}`)
+            } else {
+              console.log(`---> Error: ${index} ${portalUrl}`)
+              console.error(err)
+            }
             fetcher.error = err
           })
       }
