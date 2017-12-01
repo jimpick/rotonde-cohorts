@@ -76,7 +76,35 @@ async function processCohortPortals () {
           console.log('indexes-updated for', url, 'at version', version)
         } else {
           fetchers[url].fetched = true
+          fetchers[url].indexed = true
           fetchers[url].version = version
+        }
+      })
+      webdbCohortPortals.on('source-missing', (url) => {
+        console.log('WebDB couldnt find', url, '- now searching')
+      })
+      webdbCohortPortals.on('source-found', (url) => {
+        if (!fetchers[url]) {
+          console.log('WebDB has found and indexed', url)
+        } else {
+          fetchers[url].fetched = true
+          fetchers[url].indexed = true
+        }
+      })
+      webdbCohortPortals.on('source-error', (url, err) => {
+        console.log(`---> Error: ${url}`)
+        // console.log('WebDB failed to index', url, err)
+        if (fetchers[url]) {
+          fetchers[url].indexed = false
+          fetchers[url].error = err
+        }
+      })
+      webdbCohortPortals.on('index-error', (url, file, err) => {
+        console.log(`---> Error: ${url} ${file}`)
+        // console.log('WebDB failed to index', url, err)
+        if (fetchers[url]) {
+          fetchers[url].indexed = false
+          fetchers[url].error = err
         }
       })
       let count = 1
@@ -118,16 +146,18 @@ async function processCohortPortals () {
       for (let i = 1; i <= settleTime; i++ ) {
         await sleep(1)
         let fetchedCount = 0
+        let indexedCount = 0
         let errorCount = 0
-        Object.values(fetchers).forEach(({ fetched, error }) => {
+        Object.values(fetchers).forEach(({ fetched, indexed, error }) => {
           if (fetched) fetchedCount++
+          if (indexed) indexedCount++
           if (error) errorCount++
         })
         console.log(
-          `  ${i} seconds: ` +
-          `${fetchedCount} fetched, ${errorCount} errors`
+          `  ${i} seconds: ${fetchedCount} fetched, ` +
+          `${indexedCount} indexed, ${errorCount} errors`
         )
-        if (fetchedCount + errorCount === total) break
+        if (indexedCount + errorCount === total) break
       }
       await webdbCohortPortals.close()
     }
@@ -150,5 +180,9 @@ async function run () {
   })
   */
 }
+
+process.on('unhandledRejection', error => {
+  console.log('Unhandled rejection', error)
+})
 
 run()
