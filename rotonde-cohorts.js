@@ -2,6 +2,7 @@
 const mkdirp = require('mkdirp')
 const DatArchive = require('node-dat-archive')
 const WebDB = require('@beaker/webdb')
+const { URL } = require('url')
 
 const webdbDir = './db'
 mkdirp.sync(webdbDir)
@@ -92,16 +93,27 @@ async function processCohortPortals () {
         }
       })
       webdbCohortPortals.on('source-error', (url, err) => {
-        console.log(`---> Error: ${url}`)
+        if (err.name === 'TimeoutError') {
+          console.log(`---> Source Timeout: ${url}`)
+          console.log(err.debugStack)
+        } else {
+          console.log(`---> Source Error: ${url} ${err}`)
+        }
         // console.log('WebDB failed to index', url, err)
         if (fetchers[url]) {
           fetchers[url].indexed = false
           fetchers[url].error = err
         }
       })
-      webdbCohortPortals.on('index-error', (url, file, err) => {
-        console.log(`---> Error: ${url} ${file}`)
+      webdbCohortPortals.on('index-error', (file, err) => {
+        if (err.name === 'TimeoutError') {
+          console.log(`---> Index Timeout: ${file}`)
+          console.log(err.debugStack)
+        } else {
+          console.log(`---> Index Error: ${file} ${err}`)
+        }
         // console.log('WebDB failed to index', url, err)
+        const { origin: url } = new URL(file)
         if (fetchers[url]) {
           fetchers[url].indexed = false
           fetchers[url].error = err
@@ -123,6 +135,7 @@ async function processCohortPortals () {
           .catch(err => {
             if (err.name === 'TimeoutError') {
               console.log(`---> Timeout: ${index} ${portalUrl}`)
+              console.log(err.debugStack)
             } else {
               console.log(`---> Error: ${index} ${portalUrl}`)
               console.error(err)
