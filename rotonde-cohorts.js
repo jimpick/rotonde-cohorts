@@ -94,30 +94,47 @@ async function processCohortPortals () {
       })
       webdbCohortPortals.on('source-error', (url, err) => {
         if (err.name === 'TimeoutError') {
-          console.log(`---> Source Timeout: ${url}`)
-          console.log(err.debugStack)
+          console.error(`---> Source Timeout: ${url}`)
+          if (fetchers[url]) {
+            fetchers[url].indexed = false
+            fetchers[url].timedOut = err
+          } else {
+            console.error('Mismatch', url)
+          }
+          // console.log(err.debugStack)
         } else {
-          console.log(`---> Source Error: ${url} ${err}`)
+          console.error(`---> Source Error: ${url} ${err}`)
+          if (fetchers[url]) {
+            fetchers[url].indexed = false
+            fetchers[url].error = err
+          } else {
+            console.error('Mismatch', url)
+          }
         }
-        // console.log('WebDB failed to index', url, err)
-        if (fetchers[url]) {
-          fetchers[url].indexed = false
-          fetchers[url].error = err
-        }
+        // console.error('WebDB failed to index', url, err)
       })
       webdbCohortPortals.on('index-error', (file, err) => {
+        const { protocol, host } = new URL(file)
+        const url = `${protocol}//${host}`
         if (err.name === 'TimeoutError') {
           console.log(`---> Index Timeout: ${file}`)
-          console.log(err.debugStack)
+          if (fetchers[url]) {
+            fetchers[url].indexed = false
+            fetchers[url].timedOut = err
+          } else {
+            console.error('Mismatch', url)
+          }
+          // console.error(err.debugStack)
         } else {
           console.log(`---> Index Error: ${file} ${err}`)
+          if (fetchers[url]) {
+            fetchers[url].indexed = false
+            fetchers[url].error = err
+          } else {
+            console.error('Mismatch', url)
+          }
         }
-        // console.log('WebDB failed to index', url, err)
-        const { origin: url } = new URL(file)
-        if (fetchers[url]) {
-          fetchers[url].indexed = false
-          fetchers[url].error = err
-        }
+        // console.error('WebDB failed to index', url, err)
       })
       let count = 1
       for (const portalUrl of port) {
@@ -136,9 +153,13 @@ async function processCohortPortals () {
             if (err.name === 'TimeoutError') {
               console.log(`---> Timeout: ${index} ${portalUrl}`)
               console.log(err.debugStack)
+              fetchers[portalUrl].indexed = false
+              fetchers[portalUrl].timedOut = err
             } else {
               console.log(`---> Error: ${index} ${portalUrl}`)
               console.error(err)
+              fetchers[portalUrl].indexed = false
+              fetchers[portalUrl].error = err
             }
             fetcher.error = err
           })
@@ -160,17 +181,22 @@ async function processCohortPortals () {
         await sleep(1)
         let fetchedCount = 0
         let indexedCount = 0
+        let timedOutCount = 0
         let errorCount = 0
-        Object.values(fetchers).forEach(({ fetched, indexed, error }) => {
+        Object.values(fetchers).forEach(fetcher => {
+          const { fetched, indexed, timedOut, error } = fetcher
           if (fetched) fetchedCount++
           if (indexed) indexedCount++
+          if (timedOut) timedOutCount++
           if (error) errorCount++
         })
         console.log(
           `  ${i} seconds: ${fetchedCount} fetched, ` +
-          `${indexedCount} indexed, ${errorCount} errors`
+          `${indexedCount} indexed, ` +
+          `${timedOutCount} timeouts, ` +
+          `${errorCount} errors`
         )
-        if (indexedCount + errorCount === total) break
+        if (indexedCount + timedOutCount + errorCount === total) break
       }
       await webdbCohortPortals.close()
     }
