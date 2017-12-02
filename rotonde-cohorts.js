@@ -151,17 +151,16 @@ async function processCohortPortals () {
           .addSource(portalUrl)
           .catch(err => {
             if (err.name === 'TimeoutError') {
-              console.log(`---> Timeout: ${index} ${portalUrl}`)
-              console.log(err.debugStack)
-              fetchers[portalUrl].indexed = false
-              fetchers[portalUrl].timedOut = err
+              console.log(`---> Timeout: ${index} ${normalizedUrl}`)
+              // console.log(err.debugStack)
+              fetcher.indexed = false
+              fetcher.timedOut = err
             } else {
-              console.log(`---> Error: ${index} ${portalUrl}`)
+              console.log(`---> Error: ${index} ${normalizedUrl}`)
               console.error(err)
-              fetchers[portalUrl].indexed = false
-              fetchers[portalUrl].error = err
+              fetcher.indexed = false
+              fetcher.error = err
             }
-            fetcher.error = err
           })
       }
       const total = count - 1
