@@ -1,8 +1,8 @@
-
+const fs = require('fs')
+const { URL } = require('url')
 const mkdirp = require('mkdirp')
 const DatArchive = require('node-dat-archive')
 const WebDB = require('@beaker/webdb')
-const { URL } = require('url')
 
 const webdbDir = './db'
 mkdirp.sync(webdbDir)
@@ -62,15 +62,34 @@ function sleep (seconds) {
   return promise
 }
 
+async function writeOutPortals(cohortName, db) {
+  console.log('Writing out portals')
+  mkdirp.sync('db/portals')
+  const portals = await db.portals.toArray()
+  for (const portal of portals) {
+    const url = portal.getRecordURL().replace(/\/portal\.json$/, '')
+    const { name } = portal
+    const record = {
+      cohortName,
+      name,
+      url
+    }
+    const id = url.replace(/^dat:\/\//, '')
+    fs.writeFileSync(`db/portals/${id}.json`, JSON.stringify(record, null, 2))
+  }
+}
+
 async function processCohortPortals () {
   const cohortPortals = await webdbCohorts.cohorts.toArray()
   for (const portal of cohortPortals) {
-    const { name, port } = portal
-    if (name.match(/^cohort-/)) {
-      console.log('Portal:', name)
-      const webdbCohortPortals = new WebDB(`${webdbDir}/${name}`, { DatArchive })
+    const { name: cohortName, port } = portal
+    if (cohortName.match(/^cohort-/)) {
+      console.log('Portal:', cohortName)
+      const webdbCohortPortals = new WebDB(`${webdbDir}/${cohortName}`, { DatArchive })
       webdbCohortPortals.define('portals', portalDefinition)
+      console.log('Opening...')
       await webdbCohortPortals.open()
+      console.log('Opened')
       const fetchers = {}
       webdbCohortPortals.on('indexes-updated', async ({ url }, version) => {
         if (!fetchers[url]) {
@@ -197,6 +216,7 @@ async function processCohortPortals () {
         )
         if (indexedCount + timedOutCount + errorCount === total) break
       }
+      await writeOutPortals(cohortName, webdbCohortPortals)
       await webdbCohortPortals.close()
     }
   }
