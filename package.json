@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "@beaker/webdb": "jimpick/webdb#rotonde-cohorts",
+    "lodash": "^4.17.4",
     "mkdirp": "^0.5.1",
     "node-dat-archive": "jimpick/node-dat-archive#rotonde-cohorts"
   },

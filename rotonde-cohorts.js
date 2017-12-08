@@ -1,6 +1,7 @@
 const fs = require('fs')
 const { URL } = require('url')
 const mkdirp = require('mkdirp')
+const { isEqual } = require('lodash')
 const DatArchive = require('node-dat-archive')
 const WebDB = require('@beaker/webdb')
 
@@ -75,7 +76,15 @@ async function writeOutPortals(cohortName, db) {
       url
     }
     const id = url.replace(/^dat:\/\//, '')
-    fs.writeFileSync(`db/portals/${id}.json`, JSON.stringify(record, null, 2))
+    const file = `db/portals/${id}.json`
+    let oldRecord
+    if (fs.existsSync(file)) {
+      oldRecord = JSON.parse(fs.readFileSync(file, 'utf8'))
+    }
+    if (!oldRecord || (oldRecord && !isEqual(record, oldRecord))) {
+      console.log('Wrote:', file)
+      fs.writeFileSync(file, JSON.stringify(record, null, 2))
+    }
   }
 }
 
