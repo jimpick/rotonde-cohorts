@@ -4,6 +4,7 @@ const mkdirp = require('mkdirp')
 const { isEqual } = require('lodash')
 const DatArchive = require('node-dat-archive')
 const WebDB = require('@beaker/webdb')
+const blackList = require('./blacklist')
 
 const webdbDir = './db'
 mkdirp.sync(webdbDir)
@@ -75,6 +76,7 @@ async function writeOutPortals(cohortName, db) {
       name,
       url
     }
+    if (blackList.includes(url)) continue
     const id = url.replace(/^dat:\/\//, '')
     const file = `db/portals/${id}.json`
     let oldRecord
@@ -99,6 +101,11 @@ async function processCohortPortals () {
       console.log('Opening...')
       await webdbCohortPortals.open()
       console.log('Opened')
+      // Blacklist
+      // FIXME: Figure out how to automatically remove urls that have been unfollowed
+      for (const key of blackList) {
+        await webdbCohortPortals.removeSource(key)
+      }
       const fetchers = {}
       webdbCohortPortals.on('indexes-updated', async ({ url }, version) => {
         if (!fetchers[url]) {
@@ -168,6 +175,10 @@ async function processCohortPortals () {
       for (const portalUrl of port) {
         const index = count++
         console.log(`  ${index}:`, portalUrl)
+        if (blackList.includes(portalUrl)) {
+          console.log(`  [Blacklisted]`)
+          continue
+        }
         const normalizedUrl = portalUrl.replace(/\/$/, '')
         const fetcher = {
           index,

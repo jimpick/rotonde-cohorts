@@ -2,6 +2,7 @@ const mkdirp = require('mkdirp')
 const DatArchive = require('node-dat-archive')
 const WebDB = require('@beaker/webdb')
 const fs = require('fs')
+const blackList = require('./blacklist')
 
 const webdbDir = './db-all-portals'
 mkdirp.sync(webdbDir)
@@ -40,6 +41,20 @@ const webdbAllPortalsUrl = 'dat://5a3a9ce433f80af5d5f024df1d663f02e00cd0aa7cab84
 async function processPortals () {
   const portals = await webdbAllPortals.allPortals.toArray()
   await webdbAllPortals.addSource(webdbAllPortalsUrl)
+  for (const url of blackList) {
+    console.log('Blacklist:', url)
+    console.log('Before delete:', await webdbAllPortals.allPortals
+      .where('url')
+      .equals(url)
+      .toArray())
+    console.log('Deleted:', await webdbAllPortals.allPortals
+      .filter(record => record.url === url)
+      .delete())
+    console.log('After delete:', await webdbAllPortals.allPortals
+      .where('url')
+      .equals(url)
+      .toArray())
+  }
 }
 
 function sleep (seconds) {
@@ -51,6 +66,7 @@ function sleep (seconds) {
 
 async function run () {
   await webdbAllPortals.open()
+  console.log('Sources:', await webdbAllPortals.listSources())
   await processPortals()
   const portals = await webdbAllPortals.allPortals
     //.orderBy('cohortName+name')
@@ -59,7 +75,7 @@ async function run () {
   let output = '<pre>\n'
   portals.forEach(({name, cohortName, url}) => {
     // console.log(cohortName, name)
-    console.log(name, cohortName, url)
+    // console.log(name, cohortName, url)
     output += `${name} ${cohortName} ${url}\n`
   })
   output += '</pre>\n'
